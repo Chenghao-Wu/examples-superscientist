@@ -1,0 +1,106 @@
+name: Validate conda environment
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  drift-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: latest
+
+      - name: Verify lockfile input_hash matches environment.yml
+        run: |
+          mkdir -p /tmp/lockcheck
+          uvx --from conda-lock conda-lock \
+            --file environment.yml \
+            --platform linux-64 \
+            --kind explicit \
+            --filename-template '/tmp/lockcheck/conda-{platform}.lock'
+          fresh_hash=$(grep '^# input_hash:' /tmp/lockcheck/conda-linux-64.lock | awk '{print $3}')
+          committed_hash=$(grep '^# input_hash:' conda-linux-64.lock | awk '{print $3}')
+          if [ -z "$committed_hash" ] || [ -z "$fresh_hash" ]; then
+            echo "::error::Could not extract input_hash from one of the lockfiles."
+            exit 1
+          fi
+          if [ "$fresh_hash" != "$committed_hash" ]; then
+            echo "::error::environment.yml was edited but lockfiles were not regenerated."
+            echo "  committed input_hash: $committed_hash"
+            echo "  fresh input_hash:     $fresh_hash"
+            echo "Regenerate locally with:"
+            echo "  for plat in linux-64 osx-arm64 osx-64; do"
+            echo "    uvx --from conda-lock conda-lock --file environment.yml --platform \$plat --kind explicit --filename-template 'conda-{platform}.lock'"
+            echo "  done"
+            exit 1
+          fi
+          echo "input_hash matches: $committed_hash"
+
+  validate:
+    needs: drift-check
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux-64
+            lockfile: conda-linux-64.lock
+            micromamba_bin: micromamba-linux-64
+          - runner: macos-14
+            platform: osx-arm64
+            lockfile: conda-osx-arm64.lock
+            micromamba_bin: micromamba-osx-arm64
+          - runner: macos-13
+            platform: osx-64
+            lockfile: conda-osx-64.lock
+            micromamba_bin: micromamba-osx-64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download micromamba
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -fSL --progress-bar \
+            -o "$HOME/.local/bin/micromamba" \
+            "https://github.com/mamba-org/micromamba-releases/releases/latest/download/${{ matrix.micromamba_bin }}"
+          chmod +x "$HOME/.local/bin/micromamba"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Create superscientist environment
+        shell: bash
+        run: |
+          micromamba create -y -n superscientist --file "${{ matrix.lockfile }}"
+
+      - name: Smoke test (LAMMPS)
+        shell: bash
+        run: |
+          micromamba run -n superscientist lmp -in smoke-test.lmp
+          grep "Total wall time" log.lammps
+
+      - name: Verify Python libraries
+        shell: bash
+        run: |
+          micromamba run -n superscientist python -c "import ase, numpy, lammpsio, freud; print('OK')"
+
+      - name: Upload smoke test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-lammps-${{ matrix.platform }}
+          path: log.lammps
