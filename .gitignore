@@ -6,3 +6,7 @@ log.lammps
 # editor scratch
 .vscode/
 .idea/
+
+# conda / micromamba
+micromamba*
+envs/
