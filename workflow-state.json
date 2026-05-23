@@ -1,0 +1,165 @@
+{
+  "workflow_id": "sic-thermal-conductivity-2026-05-23",
+  "version": 1,
+  "created": "2026-05-23T23:00:00+08:00",
+  "updated": "2026-05-23T23:00:00+08:00",
+  "experiment_design": "docs/superscientist/specs/2026-05-23-sic-thermal-conductivity-design.md",
+  "workflow_plan": "docs/superscientist/plans/2026-05-23-sic-thermal-conductivity.md",
+  "amendments": [],
+  "session_config": {
+    "autonomous": false,
+    "session_budget": 6,
+    "session_count": 0,
+    "session_id": null,
+    "session_cost": 0,
+    "exit_reason": null,
+    "stage_weights": {
+      "sync": 1,
+      "async": 1.5,
+      "error_cycle": 2,
+      "diagnostic": 2
+    }
+  },
+  "default_backend": "local",
+  "backend_profiles": {
+    "local": {
+      "type": "local",
+      "config": {
+        "batch_type": "Shell",
+        "context_type": "LocalContext"
+      }
+    }
+  },
+  "stages": [
+    {
+      "id": "stage-1",
+      "name": "Structure Generation",
+      "status": "pending",
+      "depends_on": [],
+      "backend": null,
+      "inputs": [],
+      "outputs": ["stage-1/initial.data"],
+      "parameters": {
+        "software": "LAMMPS",
+        "lattice_parameter": 4.359,
+        "lattice_units": "angstrom",
+        "structure": "3C-SiC zincblende",
+        "replication": [5, 5, 5],
+        "atom_count": 1000
+      },
+      "success_criteria": "1000 atoms total; correct zincblende structure verified by coordination count (each C has 4 Si neighbors and vice versa); no overlapping atoms",
+      "started_at": null,
+      "completed_at": null,
+      "retry_count": 0,
+      "last_error": null,
+      "running_process": null
+    },
+    {
+      "id": "stage-2",
+      "name": "Equilibration",
+      "status": "pending",
+      "depends_on": ["stage-1"],
+      "backend": null,
+      "inputs": ["stage-1/initial.data"],
+      "outputs": ["stage-2/equilibrated.data", "stage-2/equilibrated.restart"],
+      "parameters": {
+        "software": "LAMMPS",
+        "npt_temperature": 300,
+        "npt_pressure": 0,
+        "npt_tdamp": 100,
+        "npt_pdamp": 1000,
+        "npt_timestep": 1.0,
+        "npt_steps": 100000,
+        "npt_ensemble": "isotropic",
+        "nvt_temperature": 300,
+        "nvt_tdamp": 100,
+        "nvt_timestep": 1.0,
+        "nvt_steps": 50000,
+        "units": "metal"
+      },
+      "success_criteria": "NPT phase: P ~0 +/- 1 bar; density converged (< 0.1% change in last 20 ps). NVT phase: T stable at 300 +/- 5 K; energy drift < 0.1% over final 20 ps",
+      "started_at": null,
+      "completed_at": null,
+      "retry_count": 0,
+      "last_error": null,
+      "running_process": null
+    },
+    {
+      "id": "stage-3",
+      "name": "Green-Kubo Production",
+      "status": "pending",
+      "depends_on": ["stage-2"],
+      "backend": null,
+      "inputs": ["stage-2/equilibrated.data", "stage-2/equilibrated.restart"],
+      "outputs": ["stage-3/heat_flux.dat", "stage-3/production.log"],
+      "parameters": {
+        "software": "LAMMPS",
+        "ensemble": "NVE",
+        "timestep": 0.0005,
+        "total_steps": 500000,
+        "total_time_ps": 500,
+        "temperature_target": 300,
+        "sample_interval": 4,
+        "sample_interval_fs": 2,
+        "correlation_length_ps": 100,
+        "correlation_length_steps": 200000,
+        "units": "metal",
+        "pair_style": "tersoff",
+        "compute": "heat/flux"
+      },
+      "success_criteria": "Energy drift < 0.01% over full 500 ps run; T remains 300 +/- 15 K (NVE fluctuation); HACF envelope decays to < 10% of zero-time peak within 100 ps correlation window; no atom displaced > 0.1 A from its starting position over full run",
+      "started_at": null,
+      "completed_at": null,
+      "retry_count": 0,
+      "last_error": null,
+      "running_process": null
+    },
+    {
+      "id": "stage-4",
+      "name": "Thermal Conductivity Analysis",
+      "status": "pending",
+      "depends_on": ["stage-3"],
+      "backend": null,
+      "inputs": ["stage-3/heat_flux.dat"],
+      "outputs": ["stage-4/kappa_report.txt", "stage-4/hacf_plot.png", "stage-4/running_integral_plot.png"],
+      "parameters": {
+        "software": "Python",
+        "integration_method": "trapezoidal",
+        "plateau_start_fraction": 0.1,
+        "plateau_slope_threshold_pct": 5,
+        "hacf_decay_threshold": 0.1,
+        "temperature": 300,
+        "volume_angstrom3": null,
+        "isotropy_tolerance_pct": 30
+      },
+      "success_criteria": "HACF envelope decays to < 10% of zero-time peak within correlation window; running integral plateau slope < 5% of plateau mean over final 50 ps of correlation window; per-component kappa agree within < 30%",
+      "started_at": null,
+      "completed_at": null,
+      "retry_count": 0,
+      "last_error": null,
+      "running_process": null
+    },
+    {
+      "id": "stage-5",
+      "name": "Validation",
+      "status": "pending",
+      "depends_on": ["stage-4"],
+      "backend": null,
+      "inputs": ["stage-4/kappa_report.txt"],
+      "outputs": ["stage-5/validation_report.txt"],
+      "parameters": {
+        "software": "Python",
+        "reference_kappa_lower": 200,
+        "reference_kappa_upper": 350,
+        "reference_source": "Tersoff MD literature range for 3C-SiC at 300 K",
+        "temperature": 300
+      },
+      "success_criteria": "Computed kappa falls within 200-350 W/m-K reference range (published Tersoff MD range for 3C-SiC at 300 K); finite-size depression of ~20-40% noted as expected",
+      "started_at": null,
+      "completed_at": null,
+      "retry_count": 0,
+      "last_error": null,
+      "running_process": null
+    }
+  ]
+}
