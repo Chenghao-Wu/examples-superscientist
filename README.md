@@ -38,6 +38,17 @@ You should see `Total wall time: 0:00:00` near the end of `log.lammps`.
 
 The [superscientist](https://github.com/Chenghao-Wu/superscientist) Claude Code skill calls `micromamba run -n superscientist lmp` directly when the `superscientist` conda environment is present.
 
+## Environment descriptor
+
+This repo serves as the canonical source of truth for the LAMMPS environment. Two files document how to bootstrap and invoke the environment:
+
+| File | Audience | Purpose |
+|---|---|---|
+| `superscientist.json` | Machines (JSON) | Command argv arrays for `lmp`, `python`, `shell` |
+| `AGENTS.md` | Humans & AI agents | Setup instructions and usage examples |
+
+Tools and Claude Code skills can read `superscientist.json` to discover how to invoke LAMMPS without hardcoding `docker run` or `micromamba run`.
+
 ## Updating dependencies
 
 1. Edit `environment.yml` (e.g., bump `lammps` version floor).
