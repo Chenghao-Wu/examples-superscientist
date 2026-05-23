@@ -88,6 +88,11 @@ jobs:
       - name: Smoke test
         run: |
           docker buildx build --platform linux/amd64 --load -t smoke-amd64 .
-          docker run --rm -v "$PWD:/work" -w /work smoke-amd64 lmp -in smoke-test.lmp
+          # Match the host wrappers (bin/lmp etc.): pass --user so the container
+          # writes log.lammps with the runner's UID rather than mambauser's UID
+          # (which would hit "Permission denied" on the bind-mounted /work).
+          docker run --rm -v "$PWD:/work" -w /work \
+            --user "$(id -u):$(id -g)" \
+            smoke-amd64 lmp -in smoke-test.lmp
           grep "Total wall time" log.lammps
           rm -f log.lammps
