@@ -1,0 +1,17 @@
+# environment.yml — human-edited package spec.
+# Lockfiles (conda-*.lock) are the source of truth installed by the Dockerfile.
+# Regenerate lockfiles with:
+#   uvx conda-lock --file environment.yml --platform linux-64 --platform linux-aarch64 --kind explicit
+name: base
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12.*
+  - lammps>=2024.08.29
+  - dpdispatcher>=0.6.7
+  - ase>=3.23
+  - lammpsio>=0.6
+  - freud>=3.0
+  - numpy
+  - matplotlib-base
