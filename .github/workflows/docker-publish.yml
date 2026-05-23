@@ -23,20 +23,34 @@ jobs:
         with:
           version: latest
 
-      - name: Verify lockfile is in sync with environment.yml
+      - name: Verify lockfile input_hash matches environment.yml
+        # We compare conda-lock's `input_hash` rather than the full file, because
+        # conda-forge frequently republishes transient packages (pip, wheel, etc.)
+        # which would cause a full-file diff even when no env.yml edits occurred.
+        # `input_hash` is derived purely from the env.yml spec, so it only changes
+        # when the user actually edits environment.yml.
         run: |
-          cp conda-linux-64.lock /tmp/before-amd64.lock
+          mkdir -p /tmp/lockcheck
           uvx --from conda-lock conda-lock \
             --file environment.yml \
             --platform linux-64 \
             --kind explicit \
-            --filename-template 'conda-{platform}.lock'
-          if ! diff -q /tmp/before-amd64.lock conda-linux-64.lock; then
-            echo "::error::conda-linux-64.lock is out of sync with environment.yml."
+            --filename-template '/tmp/lockcheck/conda-{platform}.lock'
+          fresh_hash=$(grep '^# input_hash:' /tmp/lockcheck/conda-linux-64.lock | awk '{print $3}')
+          committed_hash=$(grep '^# input_hash:' conda-linux-64.lock | awk '{print $3}')
+          if [ -z "$committed_hash" ] || [ -z "$fresh_hash" ]; then
+            echo "::error::Could not extract input_hash from one of the lockfiles."
+            exit 1
+          fi
+          if [ "$fresh_hash" != "$committed_hash" ]; then
+            echo "::error::environment.yml was edited but conda-linux-64.lock was not regenerated."
+            echo "  committed input_hash: $committed_hash"
+            echo "  fresh input_hash:     $fresh_hash"
             echo "Regenerate locally with:"
             echo "  uvx --from conda-lock conda-lock --file environment.yml --platform linux-64 --kind explicit --filename-template 'conda-{platform}.lock'"
             exit 1
           fi
+          echo "input_hash matches: $committed_hash"
 
       - name: Set up Docker buildx
         uses: docker/setup-buildx-action@v3
