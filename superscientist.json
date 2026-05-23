@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "environment": {
+    "name": "superscientist",
+    "runner": "micromamba",
+    "bootstrap": "bash bootstrap.sh"
+  },
+  "commands": {
+    "lmp": ["micromamba", "run", "-n", "superscientist", "lmp"],
+    "python": ["micromamba", "run", "-n", "superscientist", "python"],
+    "shell": ["micromamba", "run", "-n", "superscientist", "bash"]
+  }
+}
