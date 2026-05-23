@@ -1,0 +1,8 @@
+# build artifacts
+*.log
+log.lammps
+.DS_Store
+
+# editor scratch
+.vscode/
+.idea/
