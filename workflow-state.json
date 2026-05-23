@@ -1,0 +1,129 @@
+{
+  "workflow_id": "sic-thermal-conductivity-2026-05-23",
+  "version": 1,
+  "created": "2026-05-23T20:30:00+08:00",
+  "updated": "2026-05-23T20:30:00+08:00",
+  "experiment_design": "docs/superscientist/specs/2026-05-23-SiC-thermal-conductivity-design.md",
+  "workflow_plan": "docs/superscientist/plans/2026-05-23-SiC-thermal-conductivity.md",
+  "amendments": [],
+  "session_config": {
+    "autonomous": false,
+    "session_budget": 6,
+    "session_count": 0,
+    "session_id": null,
+    "session_cost": 0,
+    "exit_reason": null,
+    "stage_weights": {
+      "sync": 1,
+      "async": 1.5,
+      "error_cycle": 2,
+      "diagnostic": 2
+    }
+  },
+  "default_backend": "local",
+  "backend_profiles": {
+    "local": {
+      "type": "local",
+      "config": {
+        "batch_type": "Shell",
+        "context_type": "LocalContext"
+      }
+    }
+  },
+  "stages": [
+    {
+      "id": "stage-1",
+      "name": "Structure Generation",
+      "status": "pending",
+      "depends_on": [],
+      "backend": null,
+      "inputs": [],
+      "outputs": ["stage-1/data.3c-sic", "stage-1/build.log"],
+      "parameters": {
+        "software": "ASE",
+        "lattice_constant": 4.3596,
+        "structure": "zinc_blende",
+        "space_group": 216,
+        "supercell": [5, 5, 5]
+      },
+      "success_criteria": "1000 ± 8 atoms, 1:1 Si:C stoichiometry, min interatomic distance ≥ 1.5 Å",
+      "started_at": null,
+      "completed_at": null,
+      "retry_count": 0,
+      "last_error": null,
+      "running_process": null
+    },
+    {
+      "id": "stage-2",
+      "name": "Equilibration (NVT)",
+      "status": "pending",
+      "depends_on": ["stage-1"],
+      "backend": null,
+      "inputs": ["stage-1/data.3c-sic"],
+      "outputs": ["stage-2/log.equil", "stage-2/equil.restart", "stage-2/input.equil"],
+      "parameters": {
+        "software": "LAMMPS",
+        "potential": "Tersoff",
+        "ensemble": "NVT",
+        "timestep_fs": 0.5,
+        "temperature_K": 300,
+        "steps": 100000,
+        "tdamp_fs": 100,
+        "seed": 87287,
+        "mpi_procs": 4
+      },
+      "success_criteria": "T stable at 300 ± 5 K over final 10 ps, energy drift < 0.1% over final 10 ps",
+      "started_at": null,
+      "completed_at": null,
+      "retry_count": 0,
+      "last_error": null,
+      "running_process": null
+    },
+    {
+      "id": "stage-3",
+      "name": "NVE Production with Heat Flux Sampling",
+      "status": "pending",
+      "depends_on": ["stage-2"],
+      "backend": null,
+      "inputs": ["stage-2/equil.restart"],
+      "outputs": ["stage-3/log.prod", "stage-3/J0Jt.dat", "stage-3/prod.restart", "stage-3/input.prod"],
+      "parameters": {
+        "software": "LAMMPS",
+        "potential": "Tersoff",
+        "ensemble": "NVE",
+        "timestep_fs": 0.5,
+        "steps": 400000,
+        "sample_interval_fs": 2,
+        "seed": 87287,
+        "mpi_procs": 4
+      },
+      "success_criteria": "HACF decays to < 5% of peak within 20 ps, energy drift < 0.01% over production",
+      "started_at": null,
+      "completed_at": null,
+      "retry_count": 0,
+      "last_error": null,
+      "running_process": null
+    },
+    {
+      "id": "stage-4",
+      "name": "HACF Analysis and κ Calculation",
+      "status": "pending",
+      "depends_on": ["stage-3"],
+      "backend": null,
+      "inputs": ["stage-3/J0Jt.dat"],
+      "outputs": ["stage-4/kappa_plot.png", "stage-4/kappa_result.txt"],
+      "parameters": {
+        "software": "Python (numpy, matplotlib)",
+        "correlation_window_ps": 20,
+        "quantum_correction": "Debye_heat_capacity_ratio",
+        "debye_temperature_K": 1200
+      },
+      "success_criteria": "κ(t) running integral plateaus (slope < 0.01 W/m·K per ps over final 5 ps of correlation window), κ within 100–300 W/m·K",
+      "started_at": null,
+      "completed_at": null,
+      "retry_count": 0,
+      "last_error": null,
+      "running_process": null
+    }
+  ]
+}
