@@ -1,29 +1,22 @@
 # examples-superscientist
 
-Reproducible LAMMPS Docker environment for [superscientist](https://github.com/Chenghao-Wu/superscientist) demonstrations.
+Reproducible LAMMPS conda environment for [superscientist](https://github.com/Chenghao-Wu/superscientist) demonstrations.
 
-## Quickstart (consumer)
+## Quickstart
 
 ```bash
-docker pull ghcr.io/Chenghao-Wu/examples-superscientist:latest
-mkdir lj-demo && cd lj-demo
-curl -O https://raw.githubusercontent.com/Chenghao-Wu/examples-superscientist/main/smoke-test.lmp
-docker run --rm -v "$PWD:/work" -w /work \
-  --user "$(id -u):$(id -g)" \
-  ghcr.io/Chenghao-Wu/examples-superscientist:latest \
-  lmp -in smoke-test.lmp
+git clone https://github.com/Chenghao-Wu/examples-superscientist
+cd examples-superscientist
+bash bootstrap.sh
+```
+
+Once the environment is ready:
+
+```bash
+micromamba run -n superscientist lmp -in smoke-test.lmp
 ```
 
 You should see `Total wall time: 0:00:00` near the end of `log.lammps`.
-
-For interactive use:
-
-```bash
-docker run --rm -it -v "$PWD:/work" -w /work \
-  --user "$(id -u):$(id -g)" \
-  ghcr.io/Chenghao-Wu/examples-superscientist:latest \
-  bash
-```
 
 ## What's inside
 
@@ -32,50 +25,33 @@ docker run --rm -it -v "$PWD:/work" -w /work \
 | `lmp` | LAMMPS molecular dynamics engine (CPU + MPI, conda-forge build) |
 | `python` | Python 3.12 with `dpdispatcher`, `ase`, `lammpsio`, `freud`, `numpy`, `matplotlib-base` |
 
-Base image: `mambaorg/micromamba:2.0-ubuntu24.04`. Architecture: `linux/amd64` (Apple Silicon Macs use Docker Desktop's Rosetta 2 emulation — conda-forge has no `linux-aarch64` LAMMPS build).
+## Supported platforms
+
+| Platform | Status |
+|---|---|
+| linux-64 (x86_64) | Validated in CI |
+| osx-arm64 (Apple Silicon) | Validated in CI |
+| osx-64 (Intel Mac) | Validated in CI |
+| Windows | Use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) and follow the Linux quickstart, or install the [native LAMMPS Windows package](https://packages.lammps.org/windows.html) and create the conda env manually |
 
 ## Use with superscientist
 
-The [superscientist](https://github.com/Chenghao-Wu/superscientist) repo ships host wrappers (`bin/lmp`, `bin/lmp-python`, `bin/lmp-shell`) that hide the `docker run` invocation. Add `superscientist/bin/` to your `PATH` and superscientist's `compute-backend` skill will call `lmp` transparently.
-
-To pin a specific image version, set:
-
-```bash
-export EXAMPLES_SUPERSCIENTIST_IMAGE="ghcr.io/Chenghao-Wu/examples-superscientist:v0.1.0"
-```
-
-## Reproducing a demo bit-for-bit
-
-Always cite a versioned tag (e.g., `v0.1.0`) in shared demos, not `:latest`. The `:latest` tag floats with `main`.
-
-## Rebuilding the image yourself
-
-```bash
-git clone https://github.com/Chenghao-Wu/examples-superscientist
-cd examples-superscientist
-docker buildx build --platform linux/amd64 --load -t examples-superscientist:dev .
-```
+The [superscientist](https://github.com/Chenghao-Wu/superscientist) Claude Code skill calls `micromamba run -n superscientist lmp` directly when the `superscientist` conda environment is present.
 
 ## Updating dependencies
 
 1. Edit `environment.yml` (e.g., bump `lammps` version floor).
-2. Regenerate the lockfile:
+2. Regenerate all lockfiles:
    ```bash
-   uvx --from conda-lock conda-lock \
-     --file environment.yml \
-     --platform linux-64 \
-     --kind explicit \
-     --filename-template 'conda-{platform}.lock'
+   for plat in linux-64 osx-arm64 osx-64; do
+     uvx --from conda-lock conda-lock \
+       --file environment.yml \
+       --platform $plat \
+       --kind explicit \
+       --filename-template 'conda-{platform}.lock'
+   done
    ```
-3. Commit `environment.yml` + the regenerated `conda-linux-64.lock` together. CI's drift check enforces consistency.
-
-## Image tags
-
-| Tag | Source | Use |
-|---|---|---|
-| `latest` | every push to `main` | Casual / development use |
-| `vX.Y.Z` | git tags `vX.Y.Z` | **Cite in shared demos** |
-| `sha-<short>` | every CI build on `main` | Bisecting / debugging |
+3. Commit `environment.yml` + all regenerated lockfiles together. CI's drift check enforces consistency.
 
 ## License
 
